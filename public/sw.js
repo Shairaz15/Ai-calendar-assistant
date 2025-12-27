@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ai-calendar-v5-delete-fix';
+const CACHE_NAME = 'ai-calendar-v12-custom-select';
 const ASSETS = [
     '/',
     '/index.html',

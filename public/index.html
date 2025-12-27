@@ -60,13 +60,24 @@
                 <div
                     style="color: var(--text-muted); font-size: 0.85rem; margin-top: 1.5rem; text-transform: uppercase; letter-spacing: 1px;">
                     Themes</div>
-                <select id="themeSelect" onchange="switchTheme(this.value)" class="glass-input"
-                    style="width:100%; cursor:pointer;">
-                    <option value="default">🌌 Default Dark</option>
-                    <option value="red-black">🔴 Crimson</option>
-                    <option value="cyberpunk">🦾 Cyberpunk</option>
-                    <option value="minimal">📄 Minimal Light</option>
-                </select>
+                <div class="custom-select-wrapper" style="position: relative; width: 100%;">
+                    <div class="custom-select glass-input" id="themeSelectTrigger"
+                        style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                        <span id="currentThemeLabel">🌌 Default Dark</span>
+                        <span style="font-size: 0.8rem; opacity: 0.7;">▼</span>
+                    </div>
+                    <div class="custom-options glass-panel" id="themeOptions"
+                        style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 100; flex-direction: column; gap: 4px; padding: 4px; margin-top: 8px;">
+                        <div class="custom-option" data-value="default"
+                            onclick="selectTheme('default', '🌌 Default Dark')">🌌 Default Dark</div>
+                        <div class="custom-option" data-value="red-black"
+                            onclick="selectTheme('red-black', '🔴 Crimson')">🔴 Crimson</div>
+                        <div class="custom-option" data-value="cyberpunk"
+                            onclick="selectTheme('cyberpunk', '🦾 Cyberpunk')">🦾 Cyberpunk</div>
+                        <div class="custom-option" data-value="minimal"
+                            onclick="selectTheme('minimal', '📄 Minimal Light')">📄 Minimal Light</div>
+                    </div>
+                </div>
 
                 <div
                     style="color: var(--text-muted); font-size: 0.85rem; margin-top: 1.5rem; text-transform: uppercase; letter-spacing: 1px;">
@@ -189,9 +200,24 @@
             <input type="text" id="manualTitle" class="glass-input" style="width:100%; margin-bottom:1rem;"
                 placeholder="e.g. Lunch with Mom">
 
-            <label style="font-size:0.9rem; color:var(--text-muted); display: block; margin-bottom: 0.5rem;">Date &
-                Time</label>
-            <input type="datetime-local" id="manualDate" class="glass-input" style="width:100%; margin-bottom:1.5rem;">
+            <label
+                style="font-size:0.9rem; color:var(--text-muted); display: block; margin-bottom: 0.5rem;">Date</label>
+            <input type="date" id="manualDateOnly" class="glass-input" style="width:100%; margin-bottom:1rem;">
+
+            <div style="display:flex; gap:1rem;">
+                <div style="flex:1;">
+                    <label
+                        style="font-size:0.9rem; color:var(--text-muted); display: block; margin-bottom: 0.5rem;">Start
+                        Time</label>
+                    <input type="time" id="manualStartTime" class="glass-input"
+                        style="width:100%; margin-bottom:1.5rem;">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:0.9rem; color:var(--text-muted); display: block; margin-bottom: 0.5rem;">End
+                        Time</label>
+                    <input type="time" id="manualEndTime" class="glass-input" style="width:100%; margin-bottom:1.5rem;">
+                </div>
+            </div>
 
             <div style="display:flex; gap:1rem; justify-content:center;">
                 <button class="btn btn-primary" id="saveEventBtn">Save Event</button>
@@ -211,9 +237,13 @@
                 Title</label>
             <input type="text" id="editTitle" class="glass-input" style="width:100%; margin-bottom:1rem;">
 
-            <label style="font-size:0.9rem; color:var(--text-muted); display: block; margin-bottom: 0.5rem;">Date &
+            <label style="font-size:0.9rem; color:var(--text-muted); display: block; margin-bottom: 0.5rem;">Start
                 Time</label>
-            <input type="datetime-local" id="editDate" class="glass-input" style="width:100%; margin-bottom:1.5rem;">
+            <input type="datetime-local" id="editDate" class="glass-input" style="width:100%; margin-bottom:1rem;">
+
+            <label style="font-size:0.9rem; color:var(--text-muted); display: block; margin-bottom: 0.5rem;">End
+                Time</label>
+            <input type="datetime-local" id="editEndDate" class="glass-input" style="width:100%; margin-bottom:1.5rem;">
 
             <div style="display:flex; gap:1rem; justify-content:center;">
                 <button class="btn btn-primary" id="updateEventBtn">Update</button>

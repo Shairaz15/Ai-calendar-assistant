@@ -201,55 +201,163 @@ app.post("/processAI", async (req, res) => {
   // Tomorrow in local time
   const tomorrowDate = new Date(now);
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const todayName = days[now.getDay()];
+  const tomorrowName = days[tomorrowDate.getDay()];
+
   const tYear = tomorrowDate.getFullYear();
   const tMonth = String(tomorrowDate.getMonth() + 1).padStart(2, '0');
   const tDay = String(tomorrowDate.getDate()).padStart(2, '0');
   const tomorrowStr = `${tYear}-${tMonth}-${tDay}`;
 
-  console.log(`📅 Today: ${today}, Tomorrow: ${tomorrowStr}`);
+  console.log(`📅 Today: ${today} (${todayName}), Tomorrow: ${tomorrowStr} (${tomorrowName})`);
+
+  console.log(`📅 Today: ${today} (${todayName}), Tomorrow: ${tomorrowStr} (${tomorrowName})`);
+
+  // 🛡️ PRE-PARSE: Bypass AI for simple commands (Fast & Reliable)
+  const lowerText = text.toLowerCase().trim();
+
+  // 1. Simple Delete
+  if (lowerText === 'delete' || lowerText === 'remove' || /^delete\s+./.test(lowerText) || /^remove\s+./.test(lowerText)) {
+    console.log("⚡ Pattern Match: Delete Intent");
+    let target = text.replace(/^(delete|remove|cancel|clear|the|my|please)\s*/gi, '').trim();
+    res.json({ result: { type: 'delete', target: target || 'event' } });
+    return;
+  }
+
+  // 2. Simple Edit
+  if (/^(edit|change|move|reschedule)\b/.test(lowerText)) {
+    console.log("⚡ Pattern Match: Edit Intent");
+    let target = text.replace(/^(edit|change|move|reschedule|update|the|my|to)\s*/gi, '').trim();
+    res.json({ result: { type: 'edit', target: target || 'event', changes: {} } });
+    return;
+  }
+
+  // 3. Simple Query
+  if (lowerText === 'events' || lowerText === 'schedule' || /^(what|show|list)\b/.test(lowerText)) {
+    console.log("⚡ Pattern Match: Query Intent");
+    res.json({ result: { type: 'query', question: text } });
+    return;
+  }
 
   // Optimized prompt for fast models
-  const prompt = `You are a calendar AI. Today is ${today}. Tomorrow is ${tomorrowStr}.
+  const prompt = `You are a calendar assistant. 
+Current Date: ${today} (${todayName}).
+Tomorrow is: ${tomorrowStr} (${tomorrowName}).
 
-Parse this command and return ONLY valid JSON:
-"${text}"
+Parse this user command into JSON.
 
-Intent types:
-- "event" = has specific time (e.g. "at 3pm", "at 14:00", "morning", "evening")
-- "task" = no specific time, just a reminder/todo
-- "delete" = remove/delete/cancel something
-- "edit" = change/move/reschedule something
-- "query" = asking a question
+RULES:
+1. Extract the Event Title CLEANLY (remove times and dates).
+2. "from 6pm to 8pm" means Start: 18:00, End: 20:00.
+3. If no end time specified, default to 1 hour duration.
+4. "tomorrow" means use date: ${tomorrowStr}
 
-IMPORTANT DATE RULES:
-- If user says "today" use date: ${today}
-- If user says "tomorrow" use date: ${tomorrowStr}
-- If no day specified, use today: ${today}
+User Command: "${text}"
 
-Response formats:
-{"type":"event","title":"Meeting","start":"${today}T15:00:00","end":"${today}T16:00:00"}
+Responds with ONE of these JSON formats:
+
+TYPE: EVENT
+{"type":"event","title":"Gym","start":"${today}T18:00:00","end":"${today}T20:00:00"}
+(Example for "Gym from 6pm to 8pm")
+
+TYPE: TASK (no specific time)
 {"type":"task","task":"Buy groceries"}
-{"type":"delete","target":"meeting"}
-{"type":"edit","target":"gym","changes":{"newTime":"17:00"}}
-{"type":"query","question":"what events"}
 
-Time shortcuts: morning=09:00, afternoon=14:00, evening=18:00, night=21:00
+TYPE: DELETE
+{"type":"delete","target":"Gym"}
 
-Return ONLY the JSON:`;
+TYPE: EDIT
+{"type":"edit","target":"Gym","changes":{"newTime":"18:00"}}
+
+Return ONLY the JSON. Do not explain.`;
 
   try {
     let output;
     const startTime = Date.now();
 
-    try {
-      output = await callOllama(prompt);
-      console.log(`⚡ AI responded in ${Date.now() - startTime}ms`);
-    } catch (ollamaError) {
-      console.log("⚠️ Ollama failed, using fallback:", ollamaError.message);
-      output = smartFallbackParser(text, today, tomorrowStr);
+    // 🛡️ HYBRID APPROACH: Regex First!
+    // If we can parse the intent locally with high confidence, skip the AI.
+    // This solves the 0.5b model hallucination issues.
+
+    // 1. Try local parser
+    const localResult = smartFallbackParser(text, today, tomorrowStr);
+
+    // 2. Decide: Use Local or AI?
+    if (localResult.type === 'delete' || localResult.type === 'edit' || localResult.type === 'query') {
+      console.log("⚡ Using Local Parser (Command)");
+      output = localResult;
+    }
+    else if (localResult.type === 'event' && localResult.start) {
+      // If regex found a specific time, TRUST IT.
+      console.log("⚡ Using Local Parser (Event with Time)");
+      output = localResult;
+    }
+    else {
+      // Only use AI if local parser couldn't find a time/intent
+      try {
+        output = await callOllama(prompt);
+        console.log(`⚡ AI responded in ${Date.now() - startTime}ms`);
+      } catch (ollamaError) {
+        console.log("⚠️ Ollama failed, using fallback");
+        output = localResult;
+      }
     }
 
     console.log("🔍 Parsed Intent:", output);
+    const hasTomorrowDebug = /\btomorrow\b/i.test(text) || /\btommorow\b/i.test(text);
+    console.log(`🐛 DEBUG: UserInput="${text}" | HasTomorrow=${hasTomorrowDebug} | TomorrowStr=${tomorrowStr}`);
+
+    // 🛡️ Post-processing Safeguard for Dates & Times
+    if (output.type === 'event') {
+      // 1. Aggressively Fix "tomorrow" date error
+      // If user says "tomorrow" or "tommorow", FORCE the date to tomorrowStr
+      const hasTomorrow = /\btomorrow\b/i.test(text) || /\btommorow\b/i.test(text);
+      if (hasTomorrow) {
+        console.log("🛠️ Enforcing 'tomorrow' date logic...");
+        // Extract existing times or default to 10am
+        const startTime = output.start ? output.start.split('T')[1] : '10:00:00';
+        // Force date
+        output.start = `${tomorrowStr}T${startTime}`;
+
+        if (output.end) {
+          const endTime = output.end.split('T')[1];
+          output.end = `${tomorrowStr}T${endTime}`;
+        } else {
+          // Default end is +1 hour
+          const h = parseInt(startTime.split(':')[0]) + 1;
+          output.end = `${tomorrowStr}T${String(h).padStart(2, '0')}:00:00`;
+        }
+      }
+
+      // 2. Fix Time if Title looks like it has time but AI missed it
+      const timeInTitle = output.title && output.title.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
+      if (timeInTitle) {
+        // Re-parse
+        const corrected = smartFallbackParser(output.title + " " + (hasTomorrow ? 'tomorrow' : ''), today, tomorrowStr);
+        if (corrected.start) {
+          console.log("🛠️ Fixing time from title overlap...");
+          const correctTime = corrected.start.split('T')[1];
+          // Use the date we intentionally enforced above
+          const dateToUse = output.start.split('T')[0];
+          output.start = `${dateToUse}T${correctTime}`;
+
+          // Fix end time (1 hour default)
+          const startH = new Date(output.start).getHours();
+          const startM = new Date(output.start).getMinutes();
+          const endH = (startH + 1) % 24;
+          output.end = `${dateToUse}T${String(endH).padStart(2, '0')}:${String(startM).padStart(2, '0')}:00`;
+
+          // Clean title
+          output.title = output.title
+            .replace(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(\s*to\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?)?/gi, '') // Remove "6pm to 8pm"
+            .replace(/\b(at|from|on|until|till)\b/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        }
+      }
+    }
 
     // Handle different intent types
     switch (output.type) {
@@ -339,63 +447,125 @@ Return ONLY the JSON:`;
   }
 });
 
-// 🔧 Smart Fallback Parser
+// 🔧 Smart Fallback Parser (The "Regex Engine")
 function smartFallbackParser(text, today, tomorrow) {
   const lowerText = text.toLowerCase();
 
-  // Delete Detection
+  // 1. Command Detection
   if (/\b(delete|remove|cancel|clear)\b/i.test(text)) {
-    const target = text.replace(/\b(delete|remove|cancel|clear|the|my|please)\b/gi, '').trim();
+    const target = text.replace(/\b(delete|remove|cancel|clear|the|my|please|event)\b/gi, '').trim();
     return { type: "delete", target: target || "event" };
   }
-
-  // Edit Detection
   if (/\b(edit|change|move|reschedule|update)\b/i.test(text)) {
-    const target = text.replace(/\b(edit|change|move|reschedule|update|the|my|to)\b/gi, '').trim();
+    const target = text.replace(/\b(edit|change|move|reschedule|update|the|my|to|event)\b/gi, '').trim();
     return { type: "edit", target: target, changes: {} };
   }
-
-  // Query Detection
   if (/^(what|when|how many|do i have|show|list|display)\b/i.test(text)) {
     return { type: "query", question: text };
   }
 
-  // Time extraction for events
-  const timeMatch = text.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
-  const hasTimeKeyword = /\b(at|from|by|until)\b/i.test(text);
-  const hasMorningEvening = /\b(morning|afternoon|evening|night|noon)\b/i.test(text);
+  // 2. Date Logic
+  const hasTomorrow = /\btomorrow\b/i.test(text) || /\btommorow\b/i.test(text);
+  const baseDate = hasTomorrow ? tomorrow : today;
 
-  if (timeMatch || hasMorningEvening) {
-    let hours, minutes = 0;
+  // 3. Time Logic (Ranges supported!)
+  // Matches "6pm", "6:30pm", "18:00", "6 a.m."
+  const timeRegex = /(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?/ig;
+  // We need to match specifically times with AM/PM or colons to avoid matching "2" in "Title 2"
+  // So we'll iterate matches and validate them.
 
-    if (hasMorningEvening) {
-      const match = lowerText.match(/\b(morning|afternoon|evening|night|noon)\b/);
-      const timeWord = match ? match[1] : 'afternoon';
-      const timeMap = { morning: 9, noon: 12, afternoon: 14, evening: 18, night: 21 };
-      hours = timeMap[timeWord] || 14;
-    } else if (timeMatch) {
-      hours = parseInt(timeMatch[1]);
-      minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
-      const ampm = timeMatch[3]?.toLowerCase();
-      if (ampm === 'pm' && hours < 12) hours += 12;
-      if (ampm === 'am' && hours === 12) hours = 0;
+  const matches = [...text.matchAll(timeRegex)].filter(m => {
+    // Must have am/pm OR a colon OR be a known time word context (handled separately below)
+    // Actually simpler: just trust numbers if they look like times in a short string?
+    // Let's rely on the capture groups.
+    return m[3] || m[2] !== undefined; // Has PM/AM or has :Minutes
+  });
+
+  let startH = 14, startM = 0;
+  let endH = 15, endM = 0;
+  let hasSpecificTime = false;
+
+  // Helper
+  const parseTimeStr = (hStr, mStr, ampm) => {
+    let h = parseInt(hStr);
+    let m = mStr ? parseInt(mStr) : 0;
+    if (ampm) {
+      ampm = ampm.toLowerCase().replace(/\./g, '');
+      if (ampm === 'pm' && h < 12) h += 12;
+      if (ampm === 'am' && h === 12) h = 0;
+    }
+    return { h, m };
+  };
+
+  if (matches.length > 0) {
+    hasSpecificTime = true;
+    // FIRST time found is Start
+    const startObj = parseTimeStr(matches[0][1], matches[0][2], matches[0][3]);
+    startH = startObj.h;
+    startM = startObj.m;
+
+    // SECOND time found is End (if exists)
+    if (matches.length > 1) {
+      const endObj = parseTimeStr(matches[1][1], matches[1][2], matches[1][3]);
+      endH = endObj.h;
+      endM = endObj.m;
+    } else {
+      // Default duration: 1 hour
+      endH = (startH + 1) % 24;
+      endM = startM;
+    }
+  }
+  // Handle Keywords if no explicit time (morning/evening)
+  else if (/\b(morning|afternoon|evening|night|noon)\b/i.test(text)) {
+    hasSpecificTime = true;
+    const match = lowerText.match(/\b(morning|afternoon|evening|night|noon)\b/);
+    const timeWord = match ? match[1] : 'afternoon';
+    const timeMap = { morning: 9, noon: 12, afternoon: 14, evening: 18, night: 21 };
+    startH = timeMap[timeWord];
+    endH = (startH + 1) % 24;
+  }
+
+  // 4. Construct Result
+  if (hasSpecificTime) {
+    let finalDate = baseDate;
+
+    // 🧠 Smart Future Scheduling
+    // If user didn't say "tomorrow" but the time has already passed today, 
+    // assume they mean tomorrow.
+    if (!hasTomorrow) {
+      const now = new Date();
+      const nowH = now.getHours();
+      const nowM = now.getMinutes();
+
+      if (startH < nowH || (startH === nowH && startM < nowM)) {
+        finalDate = tomorrow;
+        console.log(`🧠 Time ${startH}:${startM} passed today, scheduling for tomorrow (${tomorrow})`);
+      }
     }
 
-    const hasTomorrow = lowerText.includes('tomorrow');
-    const baseDate = hasTomorrow ? tomorrow : today;
-    const start = `${baseDate}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
-    const endHours = (hours + 1) % 24;
-    const end = `${baseDate}T${String(endHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+    const start = `${finalDate}T${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}:00`;
+    const end = `${finalDate}T${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}:00`;
 
+    // Clean Title
     let title = text
-      .replace(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/gi, '')
-      .replace(/\b(at|on|tomorrow|today|morning|afternoon|evening|night|noon|schedule|add|create|set up|book)\b/gi, '')
-      .trim() || "New Event";
+      .replace(timeRegex, '') // Remove matched times
+      .replace(/\b(morning|afternoon|evening|night|noon)\b/gi, '')
+      .replace(/\b(at|from|to|until|till|on|tomorrow|tommorow|today)\b/gi, '')
+      .replace(/\b(schedule|add|create|set up|book)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Remove simple numbers left over? e.g. "2" from "2pm" if regex missed it? 
+    // Our regex consumes the number. 
+    // Check for leading punctuation
+    title = title.replace(/^[^a-zA-Z0-9]+/, '');
+
+    if (!title) title = "New Event";
 
     return { type: "event", title, start, end };
   }
 
-  // No time = Task
+  // 5. Fallback -> Task
   const taskText = text.replace(/\b(add|create|remind me to|reminder)\b/gi, '').trim();
   return { type: "task", task: taskText || text };
 }

@@ -141,11 +141,27 @@ function openEditModal(eventId) {
     document.getElementById('editEventId').value = eventId;
     document.getElementById('editTitle').value = event.title || '';
 
-    // Format date for datetime-local input
-    const date = new Date(event.date || event.start);
-    if (!isNaN(date.getTime())) {
-        const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-        document.getElementById('editDate').value = localDate.toISOString().slice(0, 16);
+    // Format Start Date
+    const startDate = new Date(event.date || event.start);
+    if (!isNaN(startDate.getTime())) {
+        const localStart = new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000);
+        document.getElementById('editDate').value = localStart.toISOString().slice(0, 16);
+    }
+
+    // Format End Date
+    if (event.end) {
+        const endDate = new Date(event.end);
+        if (!isNaN(endDate.getTime())) {
+            const localEnd = new Date(endDate.getTime() - endDate.getTimezoneOffset() * 60000);
+            document.getElementById('editEndDate').value = localEnd.toISOString().slice(0, 16);
+        }
+    } else {
+        // Default end to +1 hour if missing
+        if (!isNaN(startDate.getTime())) {
+            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+            const localEnd = new Date(endDate.getTime() - endDate.getTimezoneOffset() * 60000);
+            document.getElementById('editEndDate').value = localEnd.toISOString().slice(0, 16);
+        }
     }
 
     editModal.classList.add('active');
@@ -159,19 +175,26 @@ document.getElementById('updateEventBtn')?.addEventListener('click', () => {
     const eventId = document.getElementById('editEventId').value;
     const newTitle = document.getElementById('editTitle').value;
     const newDate = document.getElementById('editDate').value;
+    const newEndDate = document.getElementById('editEndDate').value;
 
     const eventIndex = state.events.findIndex(e => e.id === eventId);
     if (eventIndex === -1) return;
 
-    state.events[eventIndex].title = newTitle;
-    state.events[eventIndex].date = newDate;
-    state.events[eventIndex].start = newDate;
-    state.events[eventIndex].color = getEventColor(newTitle);
+    if (newTitle && newDate) {
+        state.events[eventIndex].title = newTitle;
+        state.events[eventIndex].start = new Date(newDate).toISOString();
+        state.events[eventIndex].date = state.events[eventIndex].start;
+        state.events[eventIndex].color = getEventColor(newTitle);
 
-    saveEventsToLocal();
-    renderCalendar();
-    editModal?.classList.remove('active');
-    showToast(`Updated "${newTitle}"`, 'success');
+        if (newEndDate) {
+            state.events[eventIndex].end = new Date(newEndDate).toISOString();
+        }
+
+        saveEventsToLocal();
+        renderCalendar();
+        editModal?.classList.remove('active');
+        showToast(`Updated "${newTitle}"`, 'success');
+    }
 });
 
 document.getElementById('deleteFromEditBtn')?.addEventListener('click', () => {
@@ -330,7 +353,7 @@ function renderCalendar() {
             dayCell.classList.add('today');
         }
         if (currentDayDate < today) {
-            dayCell.style.opacity = '0.5';
+            dayCell.classList.add('past-day');
         }
 
         const dayHeader = document.createElement('div');
@@ -573,12 +596,29 @@ function openDayView(date) {
         const d = new Date(evt.date || evt.start);
         const startMin = d.getHours() * 60 + d.getMinutes();
 
+        // Calculate Duration
+        let durationMin = 60; // Default 1 hour
+        if (evt.end) {
+            const endD = new Date(evt.end);
+            const diffMs = endD - d;
+            if (diffMs > 0) {
+                durationMin = diffMs / 60000;
+            }
+        }
+
+        // Cap duration if it goes beyond midnight for display simplicity? 
+        // For now, let it overflow if needed, or cap at 24h.
+
         const el = document.createElement('div');
         el.classList.add('day-event-block');
-        el.style.top = `${startMin + 16}px`;
-        el.style.height = '60px';
+        // timeline starts at 0. 1 min = 1px (based on 60px/hr height)
+        el.style.top = `${startMin}px`;
+        el.style.height = `${durationMin}px`;
         el.style.background = evt.color || 'var(--accent-primary)';
-        el.textContent = evt.title;
+        el.style.zIndex = 10; // Ensure it sits on top of lines
+
+        el.innerHTML = `<strong>${evt.title}</strong><br><span style="font-size:0.75em">${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(evt.end || d.getTime() + 3600000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>`;
+
         el.addEventListener('contextmenu', (e) => showContextMenu(e, evt.id));
         el.addEventListener('click', () => openEditModal(evt.id));
         dayTimeline.appendChild(el);
@@ -660,9 +700,25 @@ const manualModal = document.getElementById('manualEventModal');
 document.getElementById('newEventBtn')?.addEventListener('click', () => {
     manualModal?.classList.add('active');
     const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    const dateInput = document.getElementById('manualDate');
-    if (dateInput) dateInput.value = now.toISOString().slice(0, 16);
+
+    // Set Date (YYYY-MM-DD)
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    const dateInput = document.getElementById('manualDateOnly');
+    if (dateInput) dateInput.value = dateStr;
+
+    // Set Start Time (HH:MM)
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const timeInput = document.getElementById('manualStartTime');
+    if (timeInput) timeInput.value = `${hh}:${min}`;
+
+    // Set End Time (HH:MM) + 1 hour
+    const endH = String((now.getHours() + 1) % 24).padStart(2, '0');
+    const endTimeInput = document.getElementById('manualEndTime');
+    if (endTimeInput) endTimeInput.value = `${endH}:${min}`;
 });
 
 document.getElementById('closeManualBtn')?.addEventListener('click', () => {
@@ -671,19 +727,36 @@ document.getElementById('closeManualBtn')?.addEventListener('click', () => {
 
 document.getElementById('saveEventBtn')?.addEventListener('click', () => {
     const title = document.getElementById('manualTitle').value;
-    const dateStr = document.getElementById('manualDate').value;
+    const dateVal = document.getElementById('manualDateOnly').value;
+    const startVal = document.getElementById('manualStartTime').value;
+    const endVal = document.getElementById('manualEndTime').value;
 
-    if (!title || !dateStr) {
-        showToast("Please fill in all fields", 'error');
+    if (!title || !dateVal || !startVal) {
+        showToast("Please fill in logic fields", 'error');
         return;
+    }
+
+    // Combine Date + Time
+    const startISO = new Date(`${dateVal}T${startVal}:00`).toISOString();
+    let endISO;
+
+    if (endVal) {
+        endISO = new Date(`${dateVal}T${endVal}:00`).toISOString();
+        // Handle overnight events (end time < start time means next day)
+        if (new Date(endISO) < new Date(startISO)) {
+            const nextDay = new Date(new Date(endISO).getTime() + 24 * 60 * 60 * 1000);
+            endISO = nextDay.toISOString();
+        }
+    } else {
+        endISO = new Date(new Date(startISO).getTime() + 60 * 60 * 1000).toISOString();
     }
 
     const eventData = {
         id: generateId(),
         title,
-        date: dateStr,
-        start: dateStr,
-        end: dateStr,
+        date: startISO,
+        start: startISO,
+        end: endISO,
         color: getEventColor(title)
     };
 
@@ -780,9 +853,37 @@ async function init() {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme) {
         switchTheme(savedTheme);
-        const themeSelect = document.getElementById('themeSelect');
-        if (themeSelect) themeSelect.value = savedTheme;
+        const labels = {
+            'default': '🌌 Default Dark',
+            'red-black': '🔴 Crimson',
+            'cyberpunk': '🦾 Cyberpunk',
+            'minimal': '📄 Minimal Light'
+        };
+        const lbl = document.getElementById('currentThemeLabel');
+        if (lbl && labels[savedTheme]) lbl.textContent = labels[savedTheme];
     }
 }
+
+// 💧 Custom Dropdown Logic
+const themeTrigger = document.getElementById('themeSelectTrigger');
+const themeOptions = document.getElementById('themeOptions');
+const currentLabel = document.getElementById('currentThemeLabel');
+
+if (themeTrigger && themeOptions) {
+    themeTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isFlex = themeOptions.style.display === 'flex';
+        themeOptions.style.display = isFlex ? 'none' : 'flex';
+    });
+
+    document.addEventListener('click', () => {
+        themeOptions.style.display = 'none';
+    });
+}
+
+window.selectTheme = function (value, label) {
+    if (currentLabel) currentLabel.textContent = label;
+    switchTheme(value);
+};
 
 init();

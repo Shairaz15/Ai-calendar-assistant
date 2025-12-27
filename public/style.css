@@ -166,6 +166,23 @@ body {
   color: var(--text-muted);
 }
 
+/* Custom Select Style */
+/* Custom Dropdown Styling */
+.custom-option {
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.custom-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+  transform: translateX(4px);
+}
+
 /* 🏗️ Layout */
 .app-container {
   display: grid;
@@ -273,8 +290,25 @@ body {
 }
 
 .calendar-day.today {
-  border: 2px solid var(--accent-primary);
   box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.calendar-day.past-day {
+  opacity: 0.5;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.calendar-day.past-day::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: var(--text-muted);
+  transform: rotate(-15deg);
+  opacity: 0.3;
+  pointer-events: none;
 }
 
 .day-number {
@@ -711,7 +745,7 @@ body {
 /* 🌞 Day View Timeline */
 .time-slot {
   height: 60px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 0.8rem;
   color: var(--text-muted);
   position: relative;
@@ -723,8 +757,12 @@ body {
   position: absolute;
   left: 8px;
   top: 0;
+  transform: translateY(-50%);
   font-size: 0.75rem;
   color: var(--text-muted);
+  background: var(--bg-dark);
+  /* Optional: hide line behind text */
+  padding-right: 4px;
 }
 
 .current-time-line {
