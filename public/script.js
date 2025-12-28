@@ -770,6 +770,8 @@ document.getElementById('saveEventBtn')?.addEventListener('click', () => {
 
 // 🎤 Voice (simplified)
 const voiceBtn = document.getElementById('voiceBtn');
+const voiceVisualizer = document.getElementById('voiceVisualizer');
+
 if ('webkitSpeechRecognition' in window && voiceBtn) {
     const recognition = new webkitSpeechRecognition();
     recognition.continuous = false;
@@ -778,17 +780,25 @@ if ('webkitSpeechRecognition' in window && voiceBtn) {
     voiceBtn.onclick = () => {
         recognition.start();
         voiceBtn.classList.add('listening');
+        voiceVisualizer?.classList.add('active'); // Show animation
         expandPanel();
     };
 
     recognition.onresult = (event) => {
         eventInput.value = event.results[0][0].transcript;
         voiceBtn.classList.remove('listening');
+        voiceVisualizer?.classList.remove('active'); // Hide animation
         handleInput();
     };
 
-    recognition.onerror = () => voiceBtn.classList.remove('listening');
-    recognition.onend = () => voiceBtn.classList.remove('listening');
+    recognition.onerror = () => {
+        voiceBtn.classList.remove('listening');
+        voiceVisualizer?.classList.remove('active');
+    };
+    recognition.onend = () => {
+        voiceBtn.classList.remove('listening');
+        voiceVisualizer?.classList.remove('active');
+    };
 }
 
 // 🎨 Theme Switcher

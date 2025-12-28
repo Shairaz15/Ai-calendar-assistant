@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ai-calendar-v12-custom-select';
+const CACHE_NAME = 'ai-calendar-v13-voice-viz';
 const ASSETS = [
     '/',
     '/index.html',
