@@ -6,8 +6,30 @@ const state = {
     timeLeft: 25 * 60,
     weather: null,
     isPanelExpanded: false,
-    selectedEventId: null
+    selectedEventId: null,
+    // 🔄 IMPROVEMENT #3: Sync Queue for retries
+    syncQueue: [],
+    // 🚀 IMPROVEMENT #4: Cached month renders
+    cachedMonthKey: null
 };
+
+// 📝 IMPROVEMENT #5: User-Friendly Error Messages
+const errorMessages = {
+    'The specified time range is empty': "⏰ I couldn't understand the time. Try: 'Meeting at 3:30pm'",
+    'Not logged in': "🔐 Please login with Google first to sync events.",
+    'insufficient authentication': "🔐 Your session expired. Please login again.",
+    'Request had invalid authentication': "🔐 Authentication error. Try logging out and back in.",
+    'Rate Limit Exceeded': "⏳ Too many requests. Please wait a moment.",
+    'default': "❌ Something went wrong. Please try again."
+};
+
+function getFriendlyError(error) {
+    const errorStr = String(error);
+    for (const [key, msg] of Object.entries(errorMessages)) {
+        if (errorStr.includes(key)) return msg;
+    }
+    return errorMessages.default;
+}
 
 // ✅ Local Persistence
 function saveEventsToLocal() {
@@ -171,7 +193,7 @@ document.getElementById('closeEditBtn')?.addEventListener('click', () => {
     editModal?.classList.remove('active');
 });
 
-document.getElementById('updateEventBtn')?.addEventListener('click', () => {
+document.getElementById('updateEventBtn')?.addEventListener('click', async () => {
     const eventId = document.getElementById('editEventId').value;
     const newTitle = document.getElementById('editTitle').value;
     const newDate = document.getElementById('editDate').value;
@@ -181,19 +203,40 @@ document.getElementById('updateEventBtn')?.addEventListener('click', () => {
     if (eventIndex === -1) return;
 
     if (newTitle && newDate) {
+        const updates = {
+            title: newTitle,
+            start: new Date(newDate).toISOString()
+        };
+        updates.date = updates.start;
+
         state.events[eventIndex].title = newTitle;
-        state.events[eventIndex].start = new Date(newDate).toISOString();
-        state.events[eventIndex].date = state.events[eventIndex].start;
+        state.events[eventIndex].start = updates.start;
+        state.events[eventIndex].date = updates.start;
         state.events[eventIndex].color = getEventColor(newTitle);
 
         if (newEndDate) {
-            state.events[eventIndex].end = new Date(newEndDate).toISOString();
+            updates.end = new Date(newEndDate).toISOString();
+            state.events[eventIndex].end = updates.end;
+        }
+
+        // 📤 Server Sync
+        try {
+            showToast("Syncing update...", 'info');
+            const res = await fetch('/editEvent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ eventId, updates })
+            });
+            if (!res.ok) throw new Error("Update failed");
+            showToast(`Updated "${newTitle}"`, 'success');
+        } catch (err) {
+            console.error(err);
+            showToast("Update saved locally but sync failed", 'error');
         }
 
         saveEventsToLocal();
         renderCalendar();
         editModal?.classList.remove('active');
-        showToast(`Updated "${newTitle}"`, 'success');
     }
 });
 
@@ -225,12 +268,26 @@ document.getElementById('cancelDeleteBtn')?.addEventListener('click', () => {
     deleteModal?.classList.remove('active');
 });
 
-function deleteEvent(eventId) {
+async function deleteEvent(eventId) {
     const event = state.events.find(e => e.id === eventId);
     state.events = state.events.filter(e => e.id !== eventId);
     saveEventsToLocal();
     renderCalendar();
-    showToast(`Deleted "${event?.title || 'event'}"`, 'success');
+
+    // 📤 Server Sync
+    try {
+        showToast(`Deleting "${event?.title || 'event'}"...`, 'info');
+        const res = await fetch('/deleteEvent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventId })
+        });
+        if (!res.ok) throw new Error("Delete failed");
+        showToast('Deleted from Google Calendar', 'success');
+    } catch (err) {
+        console.error(err);
+        showToast("Deleted locally but sync failed", 'error');
+    }
 }
 
 // 📋 Show Event Selection List in Chat
@@ -316,7 +373,15 @@ function duplicateEvent(eventId) {
 }
 
 // 📅 Render Calendar
+// 🚀 IMPROVEMENT #4: Debounced rendering for performance
+let renderDebounceTimer = null;
 function renderCalendar() {
+    // Debounce rapid calls
+    if (renderDebounceTimer) clearTimeout(renderDebounceTimer);
+    renderDebounceTimer = setTimeout(_renderCalendarCore, 50);
+}
+
+function _renderCalendarCore() {
     const year = state.currentDate.getFullYear();
     const month = state.currentDate.getMonth();
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -380,7 +445,12 @@ function renderCalendar() {
             const evtDiv = document.createElement('div');
             evtDiv.className = 'event-tag';
             evtDiv.style.background = `linear-gradient(90deg, ${evt.color || 'var(--accent-primary)'}, transparent)`;
-            evtDiv.innerHTML = `${evt.title || "Event"}<span class="edit-icon">✏️</span>`;
+
+            // 🔄 IMPROVEMENT #2: Sync Status Indicator
+            const syncStatus = evt.syncStatus || 'synced';
+            const syncIndicator = `<span class="sync-indicator ${syncStatus}" title="${syncStatus === 'synced' ? 'Synced' : syncStatus === 'pending' ? 'Syncing...' : 'Sync Failed'}"></span>`;
+
+            evtDiv.innerHTML = `${evt.title || "Event"}${syncIndicator}<span class="edit-icon">✏️</span>`;
 
             evtDiv.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -428,7 +498,8 @@ async function handleInput() {
         console.log(`⚡ Response in ${responseTime}ms`);
 
         if (data.error) {
-            addChatMessage(`❌ ${data.error}`, 'ai');
+            // 📝 IMPROVEMENT #5: User-friendly error
+            addChatMessage(getFriendlyError(data.error), 'ai');
             return;
         }
 
@@ -440,12 +511,47 @@ async function handleInput() {
                 eventData.id = generateId();
                 eventData.date = eventData.start;
                 eventData.color = getEventColor(eventData.title);
+                // 🔄 IMPROVEMENT #2: Set initial sync status
+                eventData.syncStatus = 'pending';
 
+                // Show immediately with pending status
                 state.events.push(eventData);
                 saveEventsToLocal();
                 renderCalendar();
 
-                addChatMessage(`✅ Scheduled "${eventData.title}"`, 'ai');
+                // 📤 Sync with Server (Google Calendar)
+                try {
+                    addChatMessage(`⏳ Syncing "${eventData.title}" to Google Calendar...`, 'ai');
+                    const syncRes = await fetch('/addEvent', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ event: eventData })
+                    });
+
+                    const syncData = await syncRes.json();
+
+                    if (syncRes.ok) {
+                        eventData.syncStatus = 'synced';
+                        addChatMessage(`✅ Synced with Google Calendar!`, 'ai');
+                        if (syncData.id) eventData.id = syncData.id;
+                    } else {
+                        throw new Error(syncData.error || "Sync failed");
+                    }
+                } catch (err) {
+                    console.error("Sync Error:", err);
+                    eventData.syncStatus = 'failed';
+                    // 📝 IMPROVEMENT #5: Friendly error + quick fix
+                    const friendlyMsg = getFriendlyError(err.message);
+                    addChatMessage(friendlyMsg, 'ai');
+
+                    // 🔄 IMPROVEMENT #3: Add to retry queue
+                    state.syncQueue.push({ type: 'add', event: eventData });
+                    showRetryButton();
+                }
+
+                saveEventsToLocal();
+                renderCalendar();
+                renderCalendar();
                 showToast(`Event created!`, 'success');
                 break;
             }
@@ -464,7 +570,7 @@ async function handleInput() {
                 );
 
                 if (matchingEvents.length === 0) {
-                    // Show all events if no match found or generic delete request
+                    // ... (Existing logic for no match)
                     if (state.events.length === 0) {
                         addChatMessage(`❌ No events to delete.`, 'ai');
                     } else {
@@ -473,10 +579,11 @@ async function handleInput() {
                     }
                 } else if (matchingEvents.length === 1) {
                     const evt = matchingEvents[0];
+                    // Trigger confirmation which leads to deleteEvent()
+                    // We need updates there too, but let's assume deleteEvent handles sync (Update it next)
                     openDeleteConfirm(evt.id);
                     addChatMessage(`🗑️ Confirm delete "${evt.title}"?`, 'ai');
                 } else {
-                    // Multiple matches - show selection list
                     showEventSelectionList(matchingEvents, 'delete');
                     addChatMessage(`📋 Found ${matchingEvents.length} events. Select one to delete:`, 'ai');
                 }
@@ -510,10 +617,90 @@ async function handleInput() {
 
     } catch (err) {
         showTyping(false);
-        addChatMessage("❌ Failed to connect. Is Ollama running?", 'ai');
+        // 📝 IMPROVEMENT #5: Better connection error
+        addChatMessage("🔌 Failed to connect. Make sure the server and Ollama are running.", 'ai');
         console.error(err);
     }
 }
+
+// 🔄 IMPROVEMENT #3: Retry Button & Queue Processing
+function showRetryButton() {
+    if (!aiLog) return;
+
+    // Remove existing retry button
+    const existing = aiLog.querySelector('.retry-btn');
+    if (existing) existing.remove();
+
+    const btn = document.createElement('button');
+    btn.className = 'retry-btn';
+    btn.innerHTML = '🔄 Retry Failed Syncs';
+    btn.onclick = processRetryQueue;
+    aiLog.appendChild(btn);
+}
+
+async function processRetryQueue() {
+    if (state.syncQueue.length === 0) {
+        showToast('No pending syncs!', 'info');
+        return;
+    }
+
+    showToast(`Retrying ${state.syncQueue.length} sync(s)...`, 'info');
+
+    const queue = [...state.syncQueue];
+    state.syncQueue = [];
+
+    for (const item of queue) {
+        if (item.type === 'add') {
+            try {
+                const event = state.events.find(e => e.id === item.event.id);
+                if (!event) continue;
+
+                event.syncStatus = 'pending';
+                renderCalendar();
+
+                const res = await fetch('/addEvent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ event })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    event.syncStatus = 'synced';
+                    if (data.id) event.id = data.id;
+                    saveEventsToLocal();
+                } else {
+                    throw new Error('Sync failed');
+                }
+            } catch (e) {
+                const event = state.events.find(ev => ev.id === item.event.id);
+                if (event) {
+                    event.syncStatus = 'failed';
+                    state.syncQueue.push(item);
+                }
+            }
+        }
+    }
+
+    renderCalendar();
+
+    if (state.syncQueue.length === 0) {
+        showToast('All syncs completed!', 'success');
+        const retryBtn = aiLog?.querySelector('.retry-btn');
+        if (retryBtn) retryBtn.remove();
+    } else {
+        showToast(`${state.syncQueue.length} sync(s) still pending`, 'error');
+        showRetryButton();
+    }
+}
+
+// Auto-retry every 30 seconds
+setInterval(() => {
+    if (state.syncQueue.length > 0) {
+        console.log('🔄 Auto-retrying sync queue...');
+        processRetryQueue();
+    }
+}, 30000);
 
 // Chat UI
 function addChatMessage(msg, type) {
@@ -857,8 +1044,19 @@ async function init() {
         if (authData.loggedIn) {
             document.getElementById('authSection').style.display = 'none';
             document.getElementById('userSection').style.display = 'block';
+
+            // 👤 Populate Profile Info
+            if (authData.user) {
+                const avatar = document.getElementById('userAvatar');
+                const userName = document.getElementById('userName');
+                const userEmail = document.getElementById('userEmail');
+
+                if (avatar) avatar.src = authData.user.picture || 'https://ui-avatars.com/api/?name=User&background=6366f1&color=fff';
+                if (userName) userName.textContent = authData.user.name || 'User';
+                if (userEmail) userEmail.textContent = authData.user.email || '';
+            }
         }
-    } catch (e) { }
+    } catch (e) { console.error("Auth check failed:", e); }
 
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme) {

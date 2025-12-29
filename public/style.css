@@ -249,6 +249,7 @@ body {
   font-weight: 600;
   background: linear-gradient(90deg, var(--text-main), var(--text-muted));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -1078,4 +1079,118 @@ body {
     background: var(--accent-secondary);
     box-shadow: 0 0 15px var(--accent-secondary-glow);
   }
+}
+
+/* 🔄 IMPROVEMENT #2: Sync Status Indicators */
+.event-tag {
+  position: relative;
+}
+
+.sync-indicator {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.sync-indicator.synced {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.sync-indicator.pending {
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+  animation: syncPulse 1.5s infinite;
+}
+
+.sync-indicator.failed {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+}
+
+@keyframes syncPulse {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+/* 🔄 IMPROVEMENT #3: Retry Button */
+.retry-btn {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.retry-btn:hover {
+  background: rgba(245, 158, 11, 0.3);
+  transform: translateY(-1px);
+}
+
+/* 📊 IMPROVEMENT #5: Better Toast Styling */
+.toast.info {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.9), rgba(99, 102, 241, 0.9));
+  border-left: 4px solid #3b82f6;
+}
+
+.toast.error {
+  background: rgba(239, 68, 68, 0.9);
+  border-left: 4px solid #dc2626;
+}
+
+.toast.success {
+  background: rgba(16, 185, 129, 0.9);
+  border-left: 4px solid #059669;
+}
+
+/* Quick Fix Suggestion Box */
+.quick-fix-box {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px dashed var(--glass-border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.quick-fix-box strong {
+  color: var(--accent-secondary);
+}
+
+.quick-fix-btn {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.2s ease;
+}
+
+.quick-fix-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px var(--accent-glow);
 }

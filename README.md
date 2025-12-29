@@ -1,141 +1,155 @@
 # 🗓️ AI Calendar Assistant
 
-A beautiful, AI-powered calendar app with natural language processing. Just tell it what you want to schedule!
+An intelligent, voice-enabled calendar application powered by AI (Ollama) with seamless Google Calendar integration.
 
-![AI Calendar Preview](https://img.shields.io/badge/AI-Ollama%20Powered-blueviolet?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
-![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js)
+![AI Calendar](https://img.shields.io/badge/AI-Powered-6366f1) ![Google Calendar](https://img.shields.io/badge/Google-Calendar-4285F4) ![Node.js](https://img.shields.io/badge/Node.js-18+-339933)
 
 ---
 
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
-| 🧠 **Natural Language AI** | "Meeting with John at 3pm tomorrow" → Event created |
-| 📋 **Smart Intent Detection** | Automatically distinguishes events, tasks, edits, and deletes |
-| ✏️ **Edit & Delete** | Right-click context menu or just say "delete the meeting" |
-| 🎨 **Glassmorphism UI** | Stunning modern design with animations |
-| 🤖 **Floating AI Bubble** | Hover to expand, click outside to collapse |
-| 📱 **Progressive Web App** | Install on mobile like a native app |
-| 🔐 **Google Calendar Sync** | Optional OAuth integration |
+### 🤖 AI-Powered Scheduling
+- **Natural Language Processing**: Say "Meeting with John tomorrow at 3pm" and it's scheduled!
+- **Smart Time Parsing**: Understands formats like `half past 3`, `quarter to 4`, `3.45pm`, `midnight`
+- **Typo Tolerance**: Automatically fixes common typos (`pmn` → `pm`, `tommorow` → `tomorrow`)
+- **Intent Detection**: Recognizes add, delete, edit, and query commands
+
+### 📅 Google Calendar Sync
+- **Real-time Sync**: Events sync instantly with your Google Calendar
+- **Two-way Integration**: Create, update, and delete events directly from the app
+- **Profile Display**: Shows your Google profile picture when logged in
+
+### 🎤 Voice Commands
+- **Speech Recognition**: Click the microphone and speak your command
+- **Voice Visualizer**: Animated bars show when you're speaking
+
+### 🔄 Smart Sync Features
+- **Sync Status Indicators**: Visual dots show sync status (🟢 Synced, 🟡 Pending, 🔴 Failed)
+- **Auto-Retry**: Failed syncs automatically retry every 30 seconds
+- **Retry Button**: Manual "Retry Failed Syncs" option in chat
+
+### 🎨 Premium UI/UX
+- **Glassmorphism Design**: Beautiful frosted glass aesthetic
+- **4 Theme Options**: Default Dark, Crimson, Cyberpunk, Minimal Light
+- **Animated Background**: Floating gradient orbs
+- **Day View**: Detailed hourly timeline for any day
+
+### ⚡ Performance
+- **Debounced Rendering**: Optimized calendar updates
+- **Network-First Caching**: Always shows latest changes
+- **Instant Service Worker Updates**: No more hard reloads needed
+
+### 📝 Additional Features
+- **Focus Mode**: Built-in Pomodoro timer (25min work / 5min break)
+- **Habit Tracker**: Daily habit/task checklist
+- **Context Menu**: Right-click events to Edit, Delete, or Duplicate
+- **Smart Event Colors**: Auto-colors events based on keywords
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Node.js** 18+
-- **Ollama** with `qwen2.5:0.5b` model
+- [Node.js](https://nodejs.org/) v18+
+- [Ollama](https://ollama.ai/) with `qwen2.5:0.5b` model
+- Google Cloud Project with Calendar API enabled
 
 ### Installation
 
 ```bash
-# Clone the repo
-git clone https://github.com/Shairaz15/Ai-calendar-assistant.git
-cd Ai-calendar-assistant
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/ai-calendar-assistant.git
+cd ai-calendar-assistant
 
 # Install dependencies
 npm install
 
-# Pull the fast AI model
-ollama pull qwen2.5:0.5b
+# Create environment file
+cp .env.template .env
+# Edit .env with your Google OAuth credentials
+
+# Start Ollama (in separate terminal)
+ollama run qwen2.5:0.5b
 
 # Start the server
-npm start
+node server.js
 ```
 
-Open **http://localhost:3000** 🎉
-
----
-
-## 💬 Example Commands
-
-```
-📅 Events (with time):
-"Meeting at 3pm"
-"Lunch with Sarah tomorrow at noon"
-"Doctor appointment on Monday morning"
-
-📝 Tasks (no time):
-"Buy groceries"
-"Call mom"
-"Finish the report"
-
-🗑️ Delete:
-"Delete the meeting"
-"Remove lunch event"
-
-✏️ Edit:
-"Move gym to 5pm"
-"Change meeting to tomorrow"
-
-❓ Query:
-"What's on my calendar?"
-"Show my events"
-```
-
----
-
-## 🛠️ Tech Stack
-
-- **Frontend**: Vanilla JS, CSS3 (Glassmorphism)
-- **Backend**: Node.js, Express
-- **AI**: Ollama (local LLM - qwen2.5:0.5b)
-- **Optional**: Google Calendar API
+Open `http://localhost:3000` in your browser.
 
 ---
 
 ## ⚙️ Configuration
 
-Create a `.env` file:
+### Environment Variables (`.env`)
 
 ```env
-AI_MODEL=qwen2.5:0.5b
-
-# Optional: Google Calendar OAuth
-GOOGLE_CLIENT_ID=your_client_id
+GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your_client_secret
+SESSION_SECRET=your_random_secret
+AI_MODEL=qwen2.5:0.5b
 ```
 
-### Faster Models
+### Google Cloud Setup
 
-| Model | Speed | Size |
-|-------|-------|------|
-| `qwen2.5:0.5b` | ⚡ Fastest | 500MB |
-| `llama3.2:1b` | Fast | 1GB |
-| `phi3` | Moderate | 2.2GB |
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project
+3. Enable **Google Calendar API**
+4. Create **OAuth 2.0 Client ID** (Web Application)
+5. Add Authorized Redirect URI: `http://localhost:3000/auth/google/callback`
+6. Copy Client ID and Secret to `.env`
+
+---
+
+## 🎯 Usage Examples
+
+| Command | Result |
+|---------|--------|
+| "Meeting with Sarah at 3pm" | Creates event today at 3:00 PM |
+| "Lunch tomorrow at noon" | Creates event tomorrow at 12:00 PM |
+| "Delete the meeting" | Opens delete confirmation |
+| "What do I have today?" | Lists today's events |
+| "Reschedule lunch" | Opens edit modal for lunch event |
+
+---
+
+## 🛠️ Tech Stack
+
+- **Backend**: Node.js, Express.js
+- **Frontend**: Vanilla HTML/CSS/JavaScript
+- **AI**: Ollama (local LLM)
+- **Auth**: Google OAuth 2.0
+- **Calendar**: Google Calendar API
+- **Design**: Glassmorphism CSS
 
 ---
 
 ## 📁 Project Structure
 
 ```
+ai-calendar-assistant/
+├── server.js          # Express server + API routes
 ├── public/
-│   ├── index.html      # Main UI
-│   ├── script.js       # Frontend logic
-│   ├── style.css       # Glassmorphism styles
-│   ├── sw.js           # Service Worker (PWA)
-│   └── manifest.json   # PWA manifest
-├── server.js           # Express + AI endpoints
-├── package.json
-└── .env               # Configuration
+│   ├── index.html     # Main HTML
+│   ├── style.css      # Styles (themes, animations)
+│   ├── script.js      # Frontend logic
+│   ├── sw.js          # Service Worker
+│   └── manifest.json  # PWA manifest
+├── .env               # Environment variables (git-ignored)
+├── .env.template      # Environment template
+└── package.json       # Dependencies
 ```
-
----
-
-## 🤝 Contributing
-
-Pull requests welcome! For major changes, open an issue first.
 
 ---
 
 ## 📄 License
 
-MIT © 2024
+MIT License - feel free to use and modify!
 
 ---
 
-<p align="center">
-  Made with ❤️ and AI
-</p>
+## 🙏 Acknowledgments
+
+- [Ollama](https://ollama.ai/) for local AI inference
+- [Google Calendar API](https://developers.google.com/calendar)
+- [Inter Font](https://rsms.me/inter/)

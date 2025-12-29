@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ai-calendar-v13-voice-viz';
+const CACHE_NAME = 'ai-calendar-v14-sync-fix'; // Bumped version
 const ASSETS = [
     '/',
     '/index.html',
@@ -8,18 +8,36 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
+    // 🚀 Force new SW to activate immediately
+    self.skipWaiting();
     e.waitUntil(
         caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
     );
 });
 
+self.addEventListener('activate', (e) => {
+    // 🧹 Clean old caches and take control immediately
+    e.waitUntil(
+        caches.keys().then((keys) => {
+            return Promise.all(
+                keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+            );
+        }).then(() => self.clients.claim())
+    );
+});
+
 self.addEventListener('fetch', (e) => {
-    // Network first strategy for API calls, Cache first for assets
-    if (e.request.url.includes('/auth') || e.request.url.includes('/events') || e.request.url.includes('/parseEvent')) {
-        e.respondWith(fetch(e.request));
-    } else {
-        e.respondWith(
-            caches.match(e.request).then((res) => res || fetch(e.request))
-        );
-    }
+    // 🌐 Network First Strategy (Fixes "Hard Reload" issue)
+    // Try to get fresh content first, fall back to cache if offline
+    e.respondWith(
+        fetch(e.request)
+            .then(response => {
+                // Return fresh response
+                return response;
+            })
+            .catch(() => {
+                // Network failed? Try cache
+                return caches.match(e.request);
+            })
+    );
 });

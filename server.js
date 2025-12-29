@@ -64,9 +64,28 @@ app.get("/auth/google/callback", async (req, res) => {
   }
 });
 
-app.get("/auth/user", (req, res) => {
-  if (req.session.tokens) res.json({ loggedIn: true });
-  else res.json({ loggedIn: false });
+app.get("/auth/user", async (req, res) => {
+  if (req.session.tokens) {
+    try {
+      oauth2Client.setCredentials(req.session.tokens);
+      const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+      const userInfo = await oauth2.userinfo.get();
+
+      res.json({
+        loggedIn: true,
+        user: {
+          name: userInfo.data.name,
+          email: userInfo.data.email,
+          picture: userInfo.data.picture
+        }
+      });
+    } catch (error) {
+      console.error("Profile fetch error:", error);
+      res.json({ loggedIn: true, user: null }); // Still logged in, but profile fetch failed
+    }
+  } else {
+    res.json({ loggedIn: false });
+  }
 });
 
 app.get("/auth/logout", (req, res) => {
@@ -95,39 +114,94 @@ app.post("/addEvent", isAuthenticated, async (req, res) => {
   const { event } = req.body;
   const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
+  // 🛡️ Validate and Fix Time Data
+  console.log("📥 Received Event Data:", JSON.stringify(event, null, 2));
+
+  let startDateTime = event.start || event.date;
+  let endDateTime = event.end;
+
+  // If start is missing or invalid, default to NOW + 1 hour
+  if (!startDateTime || isNaN(new Date(startDateTime).getTime())) {
+    console.warn("⚠️ Invalid or missing start time. Defaulting to +1 hour from now.");
+    const defaultStart = new Date();
+    defaultStart.setHours(defaultStart.getHours() + 1);
+    startDateTime = defaultStart.toISOString();
+  }
+
+  // If end is missing, default to start + 1 hour
+  if (!endDateTime || isNaN(new Date(endDateTime).getTime())) {
+    const endDate = new Date(startDateTime);
+    endDate.setHours(endDate.getHours() + 1);
+    endDateTime = endDate.toISOString();
+  }
+
   try {
     const eventBody = {
-      summary: event.title,
+      summary: event.title || "Untitled Event",
       description: event.description || "Created by AI Calendar",
-      start: { dateTime: event.start || event.date, timeZone: event.timeZone || "Asia/Kolkata" },
-      end: { dateTime: event.end || event.date, timeZone: event.timeZone || "Asia/Kolkata" }
+      start: { dateTime: startDateTime, timeZone: event.timeZone || "Asia/Kolkata" },
+      end: { dateTime: endDateTime, timeZone: event.timeZone || "Asia/Kolkata" }
     };
+
+    // 🔍 DEBUG: Log the event payload being sent to Google
+    console.log("📤 Sending Event to Google:", JSON.stringify(eventBody, null, 2));
 
     const response = await calendar.events.insert({
       calendarId: "primary",
       requestBody: eventBody,
     });
+    console.log("✅ Google Response:", response.status, response.data.htmlLink);
     res.json(response.data);
   } catch (error) {
-    console.error("GCal Insert Error:", error);
+    console.error("❌ GCal Insert Error:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // 🗑️ Delete Event Endpoint
-app.post("/deleteEvent", async (req, res) => {
+app.post("/deleteEvent", isAuthenticated, async (req, res) => {
   const { eventId } = req.body;
+  const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
-  // Return success for local deletion (Google sync handled separately)
-  res.json({ success: true, message: `Event ${eventId} deleted` });
+  try {
+    console.log(`🗑️ Deleting Event: ${eventId}`);
+    await calendar.events.delete({
+      calendarId: "primary",
+      eventId: eventId,
+    });
+    res.json({ success: true, message: `Event ${eventId} deleted from Google Calendar` });
+  } catch (error) {
+    console.error("❌ Delete Error:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // ✏️ Edit Event Endpoint  
-app.post("/editEvent", async (req, res) => {
+app.post("/editEvent", isAuthenticated, async (req, res) => {
   const { eventId, updates } = req.body;
+  const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
-  // Return success for local edit (Google sync handled separately)
-  res.json({ success: true, message: `Event ${eventId} updated`, updates });
+  try {
+    console.log(`✏️ Updating Event: ${eventId}`, updates);
+
+    // Map updates to Google Event Resource keys if necessary
+    // (Assuming simple updates for now, might need better mapping)
+    const patchBody = {};
+    if (updates.start) patchBody.start = { dateTime: updates.start };
+    if (updates.end) patchBody.end = { dateTime: updates.end };
+    if (updates.title) patchBody.summary = updates.title;
+
+    const response = await calendar.events.patch({
+      calendarId: "primary",
+      eventId: eventId,
+      requestBody: patchBody,
+    });
+
+    res.json({ success: true, message: `Event ${eventId} updated`, data: response.data });
+  } catch (error) {
+    console.error("❌ Update Error:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // 🧠 Fast Ollama Call with Timeout
@@ -449,78 +523,92 @@ Return ONLY the JSON. Do not explain.`;
 
 // 🔧 Smart Fallback Parser (The "Regex Engine")
 function smartFallbackParser(text, today, tomorrow) {
-  const lowerText = text.toLowerCase();
+  // 🧹 IMPROVEMENT #1: Normalize & Clean Input
+  let normalizedText = text.toLowerCase()
+    .replace(/\s+/g, ' ')           // Collapse whitespace
+    .replace(/pmn|pn|p\.?m\.?n/gi, 'pm')  // Fix typos: pmn → pm
+    .replace(/amn|an|a\.?m\.?n/gi, 'am')  // Fix typos: amn → am
+    .replace(/(\d)\.(\d{2})\s*(am|pm)/gi, '$1:$2$3') // 3.45pm → 3:45pm
+    .replace(/(\d)\s+(am|pm)/gi, '$1$2')  // "3 pm" → "3pm"
+    .replace(/half\s*past\s*(\d{1,2})/gi, (_, h) => `${h}:30`) // half past 3 → 3:30
+    .replace(/quarter\s*past\s*(\d{1,2})/gi, (_, h) => `${h}:15`) // quarter past 3 → 3:15
+    .replace(/quarter\s*to\s*(\d{1,2})/gi, (_, h) => `${parseInt(h) - 1}:45`) // quarter to 4 → 3:45
+    .replace(/(\d{1,2})\s*o'?\s*clock/gi, '$1:00'); // 3 o'clock → 3:00
+
+  const lowerText = normalizedText;
 
   // 1. Command Detection
-  if (/\b(delete|remove|cancel|clear)\b/i.test(text)) {
-    const target = text.replace(/\b(delete|remove|cancel|clear|the|my|please|event)\b/gi, '').trim();
+  if (/\b(delete|remove|cancel|clear)\b/i.test(normalizedText)) {
+    const target = normalizedText.replace(/\b(delete|remove|cancel|clear|the|my|please|event)\b/gi, '').trim();
     return { type: "delete", target: target || "event" };
   }
-  if (/\b(edit|change|move|reschedule|update)\b/i.test(text)) {
-    const target = text.replace(/\b(edit|change|move|reschedule|update|the|my|to|event)\b/gi, '').trim();
+  if (/\b(edit|change|move|reschedule|update)\b/i.test(normalizedText)) {
+    const target = normalizedText.replace(/\b(edit|change|move|reschedule|update|the|my|to|event)\b/gi, '').trim();
     return { type: "edit", target: target, changes: {} };
   }
-  if (/^(what|when|how many|do i have|show|list|display)\b/i.test(text)) {
+  if (/^(what|when|how many|do i have|show|list|display)\b/i.test(normalizedText)) {
     return { type: "query", question: text };
   }
 
   // 2. Date Logic
-  const hasTomorrow = /\btomorrow\b/i.test(text) || /\btommorow\b/i.test(text);
+  const hasTomorrow = /\btomorrow\b/i.test(normalizedText) || /\btommorow\b/i.test(normalizedText);
   const baseDate = hasTomorrow ? tomorrow : today;
 
-  // 3. Time Logic (Ranges supported!)
-  // Matches "6pm", "6:30pm", "18:00", "6 a.m."
-  const timeRegex = /(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?/ig;
-  // We need to match specifically times with AM/PM or colons to avoid matching "2" in "Title 2"
-  // So we'll iterate matches and validate them.
+  // 3. Time Logic (Enhanced!)
+  // Matches "6pm", "6:30pm", "18:00", "6am"
+  const timeRegex = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/gi;
 
-  const matches = [...text.matchAll(timeRegex)].filter(m => {
-    // Must have am/pm OR a colon OR be a known time word context (handled separately below)
-    // Actually simpler: just trust numbers if they look like times in a short string?
-    // Let's rely on the capture groups.
-    return m[3] || m[2] !== undefined; // Has PM/AM or has :Minutes
+  const matches = [...normalizedText.matchAll(timeRegex)].filter(m => {
+    const hours = parseInt(m[1]);
+    // Must have am/pm OR have minutes OR hours <= 12 (likely a time)
+    return m[3] || m[2] !== undefined || (hours >= 1 && hours <= 12);
   });
 
   let startH = 14, startM = 0;
   let endH = 15, endM = 0;
   let hasSpecificTime = false;
 
-  // Helper
+  // Helper with validation
   const parseTimeStr = (hStr, mStr, ampm) => {
     let h = parseInt(hStr);
     let m = mStr ? parseInt(mStr) : 0;
+
+    // Validate hours
+    if (h > 23 || h < 0) h = 12; // Default to noon if invalid
+    if (m > 59 || m < 0) m = 0;
+
     if (ampm) {
       ampm = ampm.toLowerCase().replace(/\./g, '');
       if (ampm === 'pm' && h < 12) h += 12;
       if (ampm === 'am' && h === 12) h = 0;
+    } else if (h <= 6) {
+      // Ambiguous time without am/pm - assume PM for business hours
+      h += 12;
     }
     return { h, m };
   };
 
   if (matches.length > 0) {
     hasSpecificTime = true;
-    // FIRST time found is Start
     const startObj = parseTimeStr(matches[0][1], matches[0][2], matches[0][3]);
     startH = startObj.h;
     startM = startObj.m;
 
-    // SECOND time found is End (if exists)
     if (matches.length > 1) {
       const endObj = parseTimeStr(matches[1][1], matches[1][2], matches[1][3]);
       endH = endObj.h;
       endM = endObj.m;
     } else {
-      // Default duration: 1 hour
       endH = (startH + 1) % 24;
       endM = startM;
     }
   }
   // Handle Keywords if no explicit time (morning/evening)
-  else if (/\b(morning|afternoon|evening|night|noon)\b/i.test(text)) {
+  else if (/\b(morning|afternoon|evening|night|noon|midday|midnight)\b/i.test(normalizedText)) {
     hasSpecificTime = true;
-    const match = lowerText.match(/\b(morning|afternoon|evening|night|noon)\b/);
+    const match = lowerText.match(/\b(morning|afternoon|evening|night|noon|midday|midnight)\b/);
     const timeWord = match ? match[1] : 'afternoon';
-    const timeMap = { morning: 9, noon: 12, afternoon: 14, evening: 18, night: 21 };
+    const timeMap = { morning: 9, noon: 12, midday: 12, afternoon: 14, evening: 18, night: 21, midnight: 0 };
     startH = timeMap[timeWord];
     endH = (startH + 1) % 24;
   }
