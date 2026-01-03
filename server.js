@@ -16,12 +16,18 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 🔐 Session middleware MUST be registered before routes that use req.session
+// 🔐 Session middleware with secure configuration
 import session from "express-session";
 app.use(session({
   secret: process.env.SESSION_SECRET || 'ai-calendar-secret-key',
   resave: false,
-  saveUninitialized: true
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
 }));
 
 // 🏠 Landing Page (unauthenticated)
@@ -33,8 +39,12 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'landing.html'));
 });
 
-// 📅 Dashboard (main calendar app)
+// 📅 Dashboard (main calendar app) - requires authentication
 app.get('/dashboard', (req, res) => {
+  // Redirect to login if not authenticated
+  if (!req.session || !req.session.tokens) {
+    return res.redirect('/auth/google');
+  }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

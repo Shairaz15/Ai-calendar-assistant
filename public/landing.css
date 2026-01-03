@@ -160,11 +160,9 @@ body {
     transition: transform var(--duration-fast) var(--ease-out-expo);
 }
 
-.nav-login-btn:hover .btn-arrow {
+.nav-login-btn:hover .btn-arrow,
+.nav-login-btn:focus-visible .btn-arrow {
     transform: translateX(4px);
-}
-
-transform: translateX(4px);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -809,13 +807,15 @@ transform: translateX(4px);
     cursor: pointer;
 }
 
-.cta-button:hover {
+.cta-button:hover,
+.cta-button:focus-visible {
     transform: translateY(-4px);
     background: rgba(255, 255, 255, 0.15);
     border-color: var(--accent-cyan);
     box-shadow:
         0 10px 40px var(--accent-cyan-glow),
         0 0 80px rgba(139, 92, 246, 0.2);
+    outline: none;
 }
 
 .cta-button:active {
