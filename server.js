@@ -9,7 +9,34 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static('public'));
+app.use(express.static('public', { index: false }));
+
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// 🔐 Session middleware MUST be registered before routes that use req.session
+import session from "express-session";
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'ai-calendar-secret-key',
+  resave: false,
+  saveUninitialized: true
+}));
+
+// 🏠 Landing Page (unauthenticated)
+app.get('/', (req, res) => {
+  // If already logged in, redirect to dashboard
+  if (req.session && req.session.tokens) {
+    return res.redirect('/dashboard');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+});
+
+// 📅 Dashboard (main calendar app)
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // ✅ Ollama Configuration - Use fastest model
 // Recommended: qwen2.5:0.5b (fastest) or llama3.2:1b (balanced)
@@ -18,15 +45,7 @@ const OLLAMA_URL = 'http://localhost:11434/api/generate';
 
 console.log(`🚀 Using Ollama Model: ${AI_MODEL}`);
 
-// 🔐 Google Auth Setup
-import session from "express-session";
 import { google } from "googleapis";
-
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'ai-calendar-secret-key',
-  resave: false,
-  saveUninitialized: true
-}));
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -57,7 +76,7 @@ app.get("/auth/google/callback", async (req, res) => {
   try {
     const { tokens } = await oauth2Client.getToken(code);
     req.session.tokens = tokens;
-    res.redirect("/");
+    res.redirect("/dashboard");
   } catch (error) {
     console.error("Auth Error:", error);
     res.redirect("/?error=auth_failed");

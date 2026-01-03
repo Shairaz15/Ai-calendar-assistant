@@ -1,0 +1,234 @@
+<!DOCTYPE html> <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path
+        d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032 c0-3.331,2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.461,2.268,15.365,1,12.545,1 C6.477,1,1.54,5.952,1.54,12s4.938,11,11.005,11c6.068,0,11.005-4.952,11.005-11c0-0.996-0.143-1.979-0.429-2.917h-10.58 V10.239z" />
+</svg>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS - AI Calendar</title>
+    <link rel="stylesheet" href="landing.css">
+    <link rel="manifest" href="manifest.json">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <meta name="description"
+        content="NEXUS - Your personal AI operating system for time. Voice commands, smart scheduling, seamless Google sync.">
+    <meta name="theme-color" content="#030712">
+    <meta property="og:title" content="NEXUS - AI Calendar">
+    <meta property="og:description" <body>
+
+<body>
+    <!-- Particle Field Background -->
+    <div class="particle-field" id="particleField" aria-hidden="true"></div>
+
+    <!-- Skip to main content -->
+    <a href="#hero" class="skip-to-content">Skip to main content</a>
+
+    <!-- Navigation -->
+    <nav class="nav-bar">
+        <div class="nav-logo">
+            <span class="logo-icon">◉</span>
+            <span class="logo-text">NEXUS</span>
+        </div>
+        <a href="/auth/google" class="nav-login-btn">
+            <span>Login</span>
+            <span class="btn-arrow">→</span>
+        </a>
+    </nav>
+
+    <!-- Section 1: Hero -->
+    <section class="section section-hero" id="hero">
+        <div class="hero-content">
+            <div class="orb-container" id="orbContainer">
+                <div class="orb-glow"></div>
+                <div class="orb" id="heroOrb">
+                    <div class="orb-inner"></div>
+                    <div class="orb-ring"></div>
+                    <div class="orb-ring orb-ring-2"></div>
+                </div>
+            </div>
+
+            <h1 class="hero-title">
+                <span class="title-line">Your Personal AI</span>
+                <span class="title-line title-gradient">Operating System</span>
+                <span class="title-line">For Time</span>
+            </h1>
+
+            <p class="hero-subtitle">Command your calendar with natural language. Let AI handle the complexity.</p>
+
+            <div class="scroll-indicator">
+                <span class="scroll-text">Scroll to explore</span>
+                <div class="scroll-arrow">
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: Voice Commands -->
+    <section class="section section-feature" id="feature-voice">
+        <div class="feature-container">
+            <div class="feature-visual">
+                <div class="voice-visual">
+                    <div class="mic-icon">🎤</div>
+                    <div class="waveform">
+                        <span class="wave-bar"></span>
+                        <span class="wave-bar"></span>
+                        <span class="wave-bar"></span>
+                        <span class="wave-bar"></span>
+                        <span class="wave-bar"></span>
+                        <span class="wave-bar"></span>
+                        <span class="wave-bar"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="feature-text">
+                <span class="feature-badge">Voice Powered</span>
+                <h2 class="feature-title">Speak Your Schedule</h2>
+                <p class="feature-example">"Meeting tomorrow at 3pm with the design team"</p>
+                <p class="feature-description">Natural language processing that understands context, relative dates, and
+                    scheduling intent. Just speak naturally.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 3: Smart Scheduling -->
+    <section class="section section-feature section-alt" id="feature-smart">
+        <div class="feature-container feature-reverse">
+            <div class="feature-visual">
+                <div class="calendar-visual">
+                    <div class="sr-only">AI-powered calendar mock showing smart scheduling suggestions</div>
+                    <div class="cal-header">
+                        <span class="cal-month">January 2026</span>
+                    </div>
+                    <div class="cal-grid">
+                        <div class="cal-day"></div>
+                        <div class="cal-day"></div>
+                        <div class="cal-day cal-day-event">3</div>
+                        <div class="cal-day"></div>
+                        <div class="cal-day cal-day-now">5</div>
+                        <div class="cal-day"></div>
+                        <div class="cal-day cal-day-event">7</div>
+                        <div class="cal-day"></div>
+                        <div class="cal-day"></div>
+                    </div>
+                    <div class="ai-suggestion">
+                        <span class="ai-dot"></span>
+                        <span>AI suggests: 2pm - 4pm</span>
+                    </div>
+                </div>
+            </div>
+            <div class="feature-text">
+                <span class="feature-badge">AI Powered</span>
+                <h2 class="feature-title">Smart Time Blocks</h2>
+                <p class="feature-example">Optimal scheduling, automatically</p>
+                <p class="feature-description">Your AI learns patterns and protects deep work time. Get intelligent
+                    suggestions for the best meeting times.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 4: Google Sync -->
+    <section class="section section-feature" id="feature-sync">
+        <div class="feature-container">
+            <div class="feature-visual">
+                <div class="sync-visual">
+                    <div class="sync-icon sync-google">
+                        <img src="https://www.google.com/favicon.ico" alt="Google" width="32" height="32">
+                    </div>
+                    <div class="sync-particles">
+                        <span class="particle-dot"></span>
+                        <span class="particle-dot"></span>
+                        <span class="particle-dot"></span>
+                    </div>
+                    <div class="sync-icon sync-nexus">◉</div>
+                </div>
+            </div>
+            <div class="feature-text">
+                <span class="feature-badge">Connected</span>
+                <h2 class="feature-title">Seamless Google Sync</h2>
+                <p class="feature-example">Two-way, real-time synchronization</p>
+                <p class="feature-description">Your events stay updated across all devices. Create here, see everywhere.
+                    Edit anywhere, sync instantly.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 5: CTA -->
+    <section class="section section-cta" id="cta">
+        <div class="cta-content">
+            <div class="cta-orb-container">
+                <div class="cta-orb">
+                    <div class="orb-inner"></div>
+                </div>
+            </div>
+
+            <h2 class="cta-title">Ready to Begin?</h2>
+            <p class="cta-subtitle">Take control of your time with AI assistance</p>
+
+            <a href="/auth/google" class="cta-button">
+                <img src="https://img.icons8.com/color/48/000000/google-logo.png" width="24" height="24" alt="Google">
+                <span>Continue with Google</span>
+            </a>
+
+            <div class="cta-features">
+                <span class="cta-feature"><span aria-hidden="true">⚡</span> Free to use</span>
+                <span class="cta-feature"><span aria-hidden="true">🔒</span> Secure OAuth</span>
+                <span class="cta-feature"><span aria-hidden="true">☁️</span> Cloud synced</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <span class="footer-text">NEXUS AI Calendar © 2026</span>
+    </footer>
+
+    <script src="landing.js"></script>
+</body>
+
+</html>
+</body>
+
+</html>
+</div>
+
+<h2 class="cta-title" id="cta-title">Ready to Begin?</h2>
+<p class="cta-subtitle">Take control of your time with AI assistance</p>
+
+<a href="/auth/google" class="cta-button" aria-label="Continue with Google to sign in">
+    <!-- Google logo SVG instead of CDN -->
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="#4285F4"
+            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+        <path fill="#34A853"
+            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+        <path fill="#FBBC05"
+            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+        <path fill="#EA4335"
+            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+    </svg>
+    <span>Continue with Google</span>
+</a>
+
+<div class="cta-features">
+    <span class="cta-feature">⚡ Free to use</span>
+    <span class="cta-feature">🔒 Secure OAuth</span>
+    <span class="cta-feature">☁️ Cloud synced</span>
+</div>
+</div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+    <span class="footer-text">NEXUS AI Calendar © <span id="currentYear"></span></span>
+</footer>
+
+<script src="landing.js"></script>
+<script>document.getElementById('currentYear').textContent = new Date().getFullYear();</script>
+</body>
+
+</html>
